@@ -1,6 +1,6 @@
 import torch.nn as nn #this line imports the torch.nn module, which provides classes and functions to build neural networks in PyTorch. It includes various layers, loss functions, and utilities for constructing and training models.
 import torch.nn.functional as F #it provides a functional interface for various operations in PyTorch, including activation functions, loss functions, and other utilities. It allows you to apply these operations directly to tensors without needing to define a separate layer or module.
-from pygcn.layers import GraphConvolution
+from .layers import GraphConvolution
 
 class GCN(nn.Module):
     def __init__(self, nfeat, nhid1, nhid2, nclass, dropout): #this function initializes the GCN model with the specified number of input features (nfeat), hidden units (nhid), output classes (nclass), and dropout rate (dropout). It sets up two GraphConvolution layers and a dropout layer to be used in the forward pass.

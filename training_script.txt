@@ -1,0 +1,171 @@
+======================================================================
+GCN TRAINING SETTINGS & HYPERPARAMETERS (pygcn)
+======================================================================
+
+You can modify these configurations by passing them as command-line flags 
+when running the script (e.g., python train.py --epochs 300 --lr 0.005).
+
+1. TRAINING LENGTH & SPEED
+----------------------------------------------------------------------
+* --epochs (Default: 200)
+  Type: Integer
+  Description: The total number of passes through the training dataset.
+               Increase if the model needs more time to converge; decrease
+               if it reaches maximum accuracy early.
+
+* --fastmode (Default: False)
+  Type: Flag (Boolean)
+  Description: Activates training pass validation. When enabled, it skips
+               the separate evaluation step to slightly speed up the 
+               time per epoch.
+
+
+2. OPTIMIZATION & LEARNING RATES
+----------------------------------------------------------------------
+* --lr (Default: 0.01)
+  Type: Float
+  Description: Initial learning rate for the Adam optimizer. Lower it 
+               (e.g., 0.001) if loss fluctuates wildly; raise it if 
+               the model learns too slowly.
+
+* --weight_decay (Default: 5e-4)
+  Type: Float
+  Description: L2 regularization penalty applied to the weights. Higher 
+               values help prevent the model from overfitting to the 
+               training set.
+
+
+3. NETWORK ARCHITECTURE & REGULARIZATION
+----------------------------------------------------------------------
+* --hidden (Default: 16)
+  Type: Integer
+  Description: Number of hidden units/features in the GCN layer. 
+               Increasing this gives the network more capacity to learn 
+               complex patterns but increases memory use and overfitting risk.
+
+* --dropout (Default: 0.5)
+  Type: Float
+  Description: Dropout rate (probability of randomly zeroing out units 
+               during training) to reduce overfitting. 0.5 means a 50% 
+               chance of dropping features.
+
+
+4. HARDWARE & REPRODUCIBILITY
+----------------------------------------------------------------------
+* --no-cuda (Default: False)
+  Type: Flag (Boolean)
+  Description: Forces the script to run entirely on the CPU, disabling 
+               CUDA GPU acceleration even if a compatible GPU is available.
+
+* --seed (Default: 42)
+  Type: Integer
+  Description: The random seed used to initialize weights and shuffle data. 
+               Change this value to test the statistical stability of 
+               your model across different runs.
+
+======================================================================
+
+======================================================================
+GCN TRAINING MODIFICATIONS IN train.py (pygcn)
+======================================================================
+
+If you want to keep your changes strictly within `train.py`, you can 
+alter several core mechanics of how the model trains:
+
+1. THE OPTIMIZER (Line 49)
+----------------------------------------------------------------------
+* Current: Adam optimizer is used by default.
+* Modification: You can replace `optim.Adam` with alternatives like 
+  `optim.SGD` or `optim.RMSprop` to see how different optimization 
+  algorithms affect training speed and accuracy.
+
+2. THE LOSS FUNCTION (Lines 67 & 78)
+----------------------------------------------------------------------
+* Current: Negative Log-Likelihood Loss (`F.nll_loss`).
+* Modification: While GCN typically uses `F.nll_loss` because the model 
+  outputs log-probabilities (`F.log_softmax`), you can adjust how loss 
+  is computed or weighted if you change your classification objective.
+
+3. EARLY STOPPING LOGIC (Inside the loop, Lines 95-97)
+----------------------------------------------------------------------
+* Current: The script blindly runs for the exact number of epochs.
+* Modification: You can modify `train(epoch)` to return `loss_val`, 
+  and write a custom Python conditional inside the epoch loop to break 
+  early if the validation loss stops improving.
+
+4. MANUAL DATA SPLIT OVERRIDES (Line 42)
+----------------------------------------------------------------------
+* Current: The script loads default index splits from `load_data()`.
+* Modification: Right after line 42, you can manually re-assign 
+  `idx_train`, `idx_val`, or `idx_test` using `torch.LongTensor()` 
+  to change how much data the model gets to train on.
+
+
+======================================================================
+UNDERSTANDING OPTIMIZERS IN DEEP LEARNING
+======================================================================
+
+What is an Optimizer?
+----------------------------------------------------------------------
+Think of training a neural network like trying to find the lowest point 
+of a foggy mountain valley (the minimum loss) while wearing a blindfold. 
+You can only feel the slope of the ground right under your feet (the 
+gradient). 
+
+The Optimizer is your navigation strategy. It looks at the gradients 
+calculated during backpropagation and decides exactly how much and in 
+what direction to update the model's weights to lower the error.
+
+
+THE THREE MAIN OPTIMIZERS IN PYTORCH
+----------------------------------------------------------------------
+
+1. SGD (Stochastic Gradient Descent)
+* How it works: It takes a step purely in the direction of the current 
+  downward slope, multiplied by a fixed learning rate. Most implementations 
+  include Momentum, which acts like a heavy ball rolling down a hill—it 
+  accumulates speed from past steps to push through flat areas or bumps.
+* Pros: Simple, computationally cheap, and often yields excellent final 
+  accuracy if tuned perfectly.
+* Cons: Uses a single, fixed learning rate for every single weight in the 
+  network. It can stall if some features need large updates and others 
+  need tiny ones.
+* Syntax Example:
+  optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9)
+
+
+2. RMSprop (Root Mean Squared Propagation)
+* How it works: Introduces Adaptive Learning Rates. It keeps a running 
+  average of how violently each weight's gradient is fluctuating. If a 
+  weight has massive, chaotic gradients, RMSprop automatically shrinks 
+  its learning rate to damp the oscillations. If it has tiny gradients, 
+  it boosts its learning rate.
+* Pros: Great for non-stationary problems, sequences, and Recurrent Neural 
+  Networks (RNNs).
+* Cons: Can sometimes overshoot the absolute best entry point of a valley 
+  near the end of training.
+* Syntax Example:
+  optimizer = optim.RMSprop(model.parameters(), lr=args.lr)
+
+
+3. Adam (Adaptive Moment Estimation)
+* How it works: Adam is the default choice in the pygcn script because 
+  it combines the best of both worlds. It takes Momentum from SGD (moving 
+  faster in consistent directions) and combines it with Adaptive Learning 
+  Rates from RMSprop (adjusting step sizes individually per weight).
+* Pros: Incredibly robust, requires very little tuning, handles noisy 
+  gradients well, and usually converges much faster than SGD.
+* Cons: Requires more computer memory because it has to track multiple 
+  running statistics for every single weight in the network.
+* Syntax Example:
+  optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+
+
+QUICK REFERENCE COMPARISON TABLE
+----------------------------------------------------------------------
+Optimizer | Learning Rate Behavior | Best Used For
+----------|------------------------|----------------------------------
+SGD       | Fixed (Same for all)   | Standard baselines; high accuracy
+RMSprop   | Adaptive (Per-weight)  | Text, sequences, and RNNs
+Adam      | Adaptive + Momentum    | Default "go-to" for Graphs/GCNs
+======================================================================
