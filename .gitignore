@@ -1,2 +1,49 @@
-.venv
-.csv
+# =========================
+# Virtual Environments
+# =========================
+.venv/
+venv/
+env/
+
+# =========================
+# Python Cache & Logs
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# =========================
+# Datasets & Large Files
+# =========================
+# Ignores all heavy traffic matrices and sensor layouts
+*.csv
+*.txt
+*.pkl
+*.h5
+*.npy
+*.npz
+!requirements.txt  # Exception: Keeps your pip requirements list if you make one
+
+# =========================
+# PyTorch Model Checkpoints
+# =========================
+# Prevents large saved model states from syncing to GitHub
+*.pt
+*.pth
+*.ckpt
+
+# =========================
+# IDE & OS Specific Files
+# =========================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========================
+# Jupyter Notebooks
+# =========================
+.ipynb_checkpoints/

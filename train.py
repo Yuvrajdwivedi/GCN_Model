@@ -1,115 +1,134 @@
-from __future__ import division #this is to ensure that the division operator behaves like in Python 3, even if we are using Python 2. It ensures that the division of two integers results in a float, rather than an integer.
-from __future__ import print_function #this is to ensure that the print function behaves like in Python 3, even if we are using Python 2. It allows us to use the print function with parentheses, rather than the print statement without parentheses.
-
 import time
 import argparse
 import numpy as np
-
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
+from sklearn.model_selection import KFold
 
 from data_utils import load_data
-from eval_utils import accuracy
 from models import GCN
 
-# Training settings
+# 1. Config
 parser = argparse.ArgumentParser()
-parser.add_argument('--no-cuda', action='store_true', default=False,
-                    help='Disables CUDA training.')
-parser.add_argument('--fastmode', action='store_true', default=False,
-                    help='Validate during training pass.')
-parser.add_argument('--seed', type=int, default=42, help='Random seed.')
-parser.add_argument('--epochs', type=int, default=500,
-                    help='Number of epochs to train.')
-parser.add_argument('--lr', type=float, default=0.001,
-                    help='Initial learning rate.')
-parser.add_argument('--weight_decay', type=float, default=5e-4,
-                    help='Weight decay (L2 loss on parameters).')
-# Replace the single '--hidden' argument with these:
-parser.add_argument('--hidden1', type=int, default=32, help='Number of hidden units for layer 1.')
-parser.add_argument('--hidden2', type=int, default=16, help='Number of hidden units for layer 2.')
-parser.add_argument('--hidden3', type=int, default=8, help='Number of hidden units for layer 3.') # New argument for the third hidden layer
-parser.add_argument('--dropout', type=float, default=0.5,
-                    help='Dropout rate (1 - keep probability).')
+parser.add_argument('--no-cuda', action='store_true', default=False)
+parser.add_argument('--seed', type=int, default=42)
+parser.add_argument('--epochs', type=int, default=150)
+parser.add_argument('--lr', type=float, default=0.001)
+parser.add_argument('--weight_decay', type=float, default=1e-4)
+parser.add_argument('--hidden', type=int, default=32)
+parser.add_argument('--dropout', type=float, default=0.3)
 
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
-np.random.seed(args.seed)
 torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
-# Load data
-adj, features, labels, idx_train, idx_val, idx_test = load_data()
+# 2. Load the Local Data
+adj, features, labels, feature_cols = load_data()
+num_nodes = features.shape[0]
+n_input_features = features.shape[1] 
 
-# Model and optimizer
-model = GCN(nfeat=features.shape[1],
-            nhid1=args.hidden1,  # First hidden layer size
-            nhid2=args.hidden2,  # Second hidden layer size
-            nhid3=args.hidden3,  # Third hidden layer size (New Layer)
-            nclass=labels.max().item() + 1,
-            dropout=args.dropout)
-optimizer = optim.Adam(model.parameters(),
-                       lr=args.lr, weight_decay=args.weight_decay)
+# 🌟 GRAPH TELEMETRY: Calculate and display the exact graph density
+num_edges = adj._nnz()
+max_possible_edges = num_nodes * num_nodes
+graph_density = (num_edges / max_possible_edges) * 100
+
+print(f"\n{'='*40}")
+print(f"GRAPH ARCHITECTURE SUMMARY:")
+print(f"Total Nodes: {num_nodes}")
+print(f"Active Network Edges: {num_edges}")
+print(f"Network Density: {graph_density:.2f}%")
+print(f"{'='*40}\n")
 
 if args.cuda:
-    model.cuda()
     features = features.cuda()
     adj = adj.cuda()
     labels = labels.cuda()
-    idx_train = idx_train.cuda()
-    idx_val = idx_val.cuda()
-    idx_test = idx_test.cuda()
 
-
-def train(epoch):
-    t = time.time()
+def train_epoch(model, optimizer, idx_train):
     model.train()
     optimizer.zero_grad()
     output = model(features, adj)
-    loss_train = F.nll_loss(output[idx_train], labels[idx_train])
-    acc_train = accuracy(output[idx_train], labels[idx_train])
+    loss_train = F.mse_loss(output[idx_train], labels[idx_train])
     loss_train.backward()
+    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
     optimizer.step()
+    return loss_train.item()
 
-    # Isolate validation to prevent variable overwrites
+def validate_epoch(model, idx_val):
     model.eval()
     with torch.no_grad():
-        output_val = model(features, adj)
-    
-    loss_val = F.nll_loss(output_val[idx_val], labels[idx_val])
-    acc_val = accuracy(output_val[idx_val], labels[idx_val])
-    
-    print('Epoch: {:04d}'.format(epoch+1),
-          'loss_train: {:.4f}'.format(loss_train.item()),
-          'acc_train: {:.4f}'.format(acc_train.item()),
-          'loss_val: {:.4f}'.format(loss_val.item()),
-          'acc_val: {:.4f}'.format(acc_val.item()),
-          'time: {:.4f}s'.format(time.time() - t))
+        output = model(features, adj)
+        loss_val = F.mse_loss(output[idx_val], labels[idx_val])
+        mae_val = torch.mean(torch.abs(output[idx_val] - labels[idx_val]))
+        
+        y_true = labels[idx_val]
+        ss_tot = torch.sum((y_true - torch.mean(y_true)) ** 2)
+        ss_res = torch.sum((y_true - output[idx_val]) ** 2)
+        acc_val = 1 - (ss_res / (ss_tot + 1e-8))
+    return loss_val.item(), mae_val.item(), acc_val.item()
 
-
-def test():
+def test_fold(model, idx_test):
     model.eval()
-    output = model(features, adj)
     with torch.no_grad():
-        loss_test = F.nll_loss(output[idx_test], labels[idx_test])
-        acc_test = accuracy(output[idx_test], labels[idx_test])
-    print("Test set results:",
-          "loss= {:.4f}".format(loss_test.item()),  
-          "accuracy= {:.4f}".format(acc_test.item()))
+        output = model(features, adj)
+        loss_test = F.mse_loss(output[idx_test], labels[idx_test])
+        mae_test = torch.mean(torch.abs(output[idx_test] - labels[idx_test]))
+        
+        y_true = labels[idx_test]
+        ss_tot = torch.sum((y_true - torch.mean(y_true)) ** 2)
+        ss_res = torch.sum((y_true - output[idx_test]) ** 2)
+        acc_test = 1 - (ss_res / (ss_tot + 1e-8))
+    return loss_test.item(), mae_test.item(), acc_test.item()
 
+kf = KFold(n_splits=5, shuffle=True, random_state=args.seed)
+cv_accuracies = []
+cv_maes = []
 
-# Train model
-t_total = time.time()
-train_set = set(idx_train.cpu().numpy())
-test_set = set(idx_test.cpu().numpy())
-val_set = set(idx_val.cpu().numpy())
-for epoch in range(args.epochs):
-    train(epoch)
-print("Optimization Finished!")
-print("Total time elapsed: {:.4f}s".format(time.time() - t_total))
+print(f"Executing 5-Fold Cross-Validation splits...")
 
-# Testing
-test()
+for fold, (train_and_val_indices, test_indices) in enumerate(kf.split(np.arange(num_nodes))):
+    print(f"\n--- FOLD {fold + 1} / 5 ---")
+    
+    np.random.shuffle(train_and_val_indices)
+    split_point = int(0.85 * len(train_and_val_indices))
+    
+    idx_train = torch.LongTensor(train_and_val_indices[:split_point])
+    idx_val = torch.LongTensor(train_and_val_indices[split_point:])
+    idx_test = torch.LongTensor(test_indices)
+    
+    if args.cuda:
+        idx_train, idx_val, idx_test = idx_train.cuda(), idx_val.cuda(), idx_test.cuda()
+        
+    model = GCN(nfeat=n_input_features, nhid1=args.hidden, nclass=1, dropout=args.dropout)
+    optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    
+    if args.cuda:
+        model.cuda()
+        
+    for epoch in range(args.epochs):
+        t_start = time.time()
+        loss_t = train_epoch(model, optimizer, idx_train)
+        loss_v, mae_v, acc_v = validate_epoch(model, idx_val)
+        
+        if (epoch + 1) % 30 == 0 or epoch == 0:
+            print(f'Epoch: {epoch+1:03d} | Train Loss: {loss_t:.4f} | Val Loss: {loss_v:.4f} | Val Acc(R²): {acc_v:.4f}')
+            
+    loss_te, mae_te, acc_te = test_fold(model, idx_test)
+    print(f">> Fold {fold + 1} Test Results -> MSE Loss: {loss_te:.4f} | MAE: {mae_te:.4f} | Accuracy (R²): {acc_te:.4f}")
+    
+    cv_maes.append(mae_te)
+    cv_accuracies.append(acc_te)
+
+print(f"\n{'='*60}")
+print(f"FINAL METR-LA BENCHMARK K-FOLD SUMMARY:")
+print(f"Average Test MAE: {np.mean(cv_maes):.4f} (+/- {np.std(cv_maes):.4f})")
+print(f"Average Test Accuracy (Global R² Score): {np.mean(cv_accuracies):.4f}")
+print(f"{'='*60}")
+# --- STEP 8: SAVE THE FINAL TRAINED MODEL ---
+print("\nSaving final model weights...")
+torch.save(model.state_dict(), "gcn_traffic_model.pth")
+print("Model saved successfully as 'gcn_traffic_model.pth'!")
