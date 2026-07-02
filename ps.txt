@@ -1,0 +1,8 @@
+**Problem Statement:** Engineering a Spatio-Temporal Graph Convolutional Network (GCN)
+to predict dynamic highway traffic flow by mathematically integrating physical network 
+topology with temporal sequences, achieving a global R² accuracy of 0.9487 and reducing 
+prediction error to ~1.5 mph.
+
+Benchmarks:
+    Average Test MAE: 1.5186 (+/- 0.5138)
+    Average Test Accuracy (Global R² Score): 0.9487
