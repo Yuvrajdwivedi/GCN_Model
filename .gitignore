@@ -19,7 +19,6 @@ __pycache__/
 # =========================
 # Ignores all heavy traffic matrices and sensor layouts
 *.csv
-*.txt
 *.pkl
 *.h5
 *.npy
