@@ -1,0 +1,43 @@
+##for Venv and instaling dependencies 
+python3 -m venv .venv  
+
+## this is for mac os or linux 
+source .venv/bin/activate
+
+## for windows we do 
+ .\.venv\Scripts\Activate.ps1
+
+python -m pip install -r requirements.txt
+
+## use this to run the app 
+python -m streamlit run 
+
+
+## langchain 
+pip install langchain-classic
+
+if langchain.chains doesnt work use langchain_classic.chains 
+
+example --
+from langchain.chains.combine_documents import create_stuff_documents_chain   ( instead of this use )
+from langchain_classic.chains.combine_documents import create_stuff_documents_chain
+
+
+## RAGAS
+You CANNOT use metrics.collections with Groq
+
+
+
+## python issue with AI applications 
+
+For the kind of project you're building (Streamlit + LangChain + LangGraph + FAISS + Sentence Transformers + GROQ/Azure), yes, I would strongly recommend Python 3.11.x.
+Not because 3.13 can't work, but because you'll run into fewer dependency headaches.
+
+so use python 3.11.x cause most of the libraries are tested on 3.11 and 3.10 
+
+### RUN THIS 
+py -3.11 -m venv .venv
+
+.venv\Scripts\activate
+
+pip install -r requirements.txt
