@@ -1,0 +1,44 @@
+======================================================================
+GIT GUIDE: REPLACING AN EXISTING GITHUB REPOSITORY WITH A NEW FOLDER
+======================================================================
+
+Follow these steps from inside your BRAND NEW local folder to wipe out 
+the old files in the online repository and replace them with your new code.
+
+STEP 1: INITIALIZE & LINK
+----------------------------------------------------------------------
+Open your CLI/Terminal, navigate inside your new project folder, and run:
+
+  git init
+  git remote add origin https://github.com/Yuvrajdwivedi/GCN_Model.git
+
+
+STEP 2: STAGE & COMMIT YOUR NEW FILES
+----------------------------------------------------------------------
+Stage everything inside your new folder and commit the changes locally:
+
+  git add .
+  git commit -m "Replace old model with fresh code structure"
+
+
+STEP 3: PUSH AND OVERWRITE THE REPOSITORY
+----------------------------------------------------------------------
+To push these files and completely overwrite the existing history/files 
+on GitHub, use the force (--force) flag:
+
+• Option A: Overwrite the 'main' branch (Recommended)
+  git push origin main --force
+
+• Option B: Overwrite the 'updated' branch instead
+  git push origin updated --force
+
+
+STEP 4: ENTER YOUR CREDENTIALS
+----------------------------------------------------------------------
+When the terminal prompts you for your GitHub credentials:
+  
+  Username: Your GitHub username (Yuvrajdwivedi)
+  Password: [Paste your GitHub Personal Access Token (PAT) here]
+
+  *Note: Your standard GitHub account password will not work in the CLI.
+======================================================================
