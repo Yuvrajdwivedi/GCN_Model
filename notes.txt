@@ -1,0 +1,17 @@
+Challenges related to ipynb file:
+
+FAILING TO CONNECT WITH VENV:
+1. Try resetting the kernal
+2. Try deleting outputs
+3. Try deleting cache 
+
+
+ACCURACY IMPROVE:
+1. Try changing:
+    =Seed 
+    =weight_decay
+    =dropout
+    =lr
+    =epochs
+2. Try to find the sweet soft spot where the accuracy gets better.
+
